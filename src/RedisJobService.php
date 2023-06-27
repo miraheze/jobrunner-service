@@ -1,7 +1,12 @@
 <?php
 
 require __DIR__ . '/RedisExceptionHA.php';
-require __DIR__ . '/../vendor/autoload.php';
+
+if ( is_readable( __DIR__ . '/../vendor/autoload.php' ) ) {
+	require_once __DIR__ . '/../vendor/autoload.php';
+} elseif ( file_exists( __DIR__ . '/../vendor/autoload.php' ) ) {
+	die( __DIR__ . '/../vendor/autoload.php exists but is not readable' );
+}
 
 use Wikimedia\IPUtils;
 
