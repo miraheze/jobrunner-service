@@ -55,6 +55,9 @@ class JobRunnerPipeline {
 				$age = $cTime - $procSlot['stime'];
 				if ( $age >= $maxReal && !$procSlot['sigtime'] ) {
 					$cmd = $procSlot['cmd'];
+					if ( is_array( $cmd ) ) {
+						$cmd = implode( ' ', $cmd );
+					}
 					$this->srvc->error( "Runner loop $loop process in slot $slot timed out " .
 						"[{$age}s; max: {$maxReal}s]:\n$cmd" );
 					// non-blocking
@@ -94,6 +97,9 @@ class JobRunnerPipeline {
 						   json_last_error(), json_last_error_msg() );
 					}
 					$cmd = $procSlot['cmd'];
+					if ( is_array( $cmd ) ) {
+						$cmd = implode( ' ', $cmd );
+					}
 					if ( $procSlot['stderr'] ) {
 						$error = $procSlot['stderr'];
 						$cmd .= ' STDERR:';
@@ -195,7 +201,7 @@ class JobRunnerPipeline {
 			$with[] = escapeshellarg( $v );
 		}
 		// The dispatcher might be runJobs.php, curl, or wget
-		$cmd = [ str_replace( $what, $with, $this->srvc->dispatcher ) ];
+		$cmd = explode( ' ', str_replace( $what, $with, $this->srvc->dispatcher ) );
 
 		$descriptors = [
 			// stdin (child)
@@ -212,7 +218,7 @@ class JobRunnerPipeline {
 		);
 
 		// Start the runner in the background
-		$procSlot['handle'] = proc_open( $cmd, $descriptors, $procSlot['pipes'] );
+		$procSlot['handle'] = proc_open( implode( ' ', $cmd ), $descriptors, $procSlot['pipes'] );
 		if ( $procSlot['handle'] ) {
 			// Make sure socket reads don't wait for data
 			stream_set_blocking( $procSlot['pipes'][1], 0 );
