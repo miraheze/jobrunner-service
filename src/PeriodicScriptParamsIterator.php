@@ -68,7 +68,7 @@ class PeriodicScriptParamsIterator implements Iterator {
 				# ARGV[7]
 				$type,
 				# ARGV[8]
-				$domain,
+				$domain
 			],
 			# number of first argument(s) that are keys
 			'keys' => 8
