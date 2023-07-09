@@ -48,6 +48,8 @@ class PeriodicScriptParamsIterator implements Iterator {
 				# KEYS[5]
 				"{$domain}:jobqueue:{$type}:z-abandoned",
 				# KEYS[6]
+				"{$domain}:jobqueue:{$type}:h-idBySha1",
+				# KEYS[7]
 				"{$domain}:jobqueue:{$type}:z-delayed",
 				# KEYS[7]
 				"global:jobqueue:s-queuesWithJobs",
@@ -62,10 +64,14 @@ class PeriodicScriptParamsIterator implements Iterator {
 				# ARGV[5]
 				$queueId,
 				# ARGV[6]
-				self::LUA_MAX_JOBS
+				self::LUA_MAX_JOBS,
+				# ARGV[7]
+				$type,
+				# ARGV[8]
+				$domain,
 			],
 			# number of first argument(s) that are keys
-			'keys' => 7
+			'keys' => 8
 		];
 	}
 
@@ -88,8 +94,8 @@ class PeriodicScriptParamsIterator implements Iterator {
 	public static function getChronScript() {
 		static $script =
 			<<<LUA
-		local kClaimed, kAttempts, kUnclaimed, kData, kAbandoned, kDelayed, kQwJobs = unpack(KEYS)
-		local rClaimCutoff, rPruneCutoff, rAttempts, rTime, queueId, rLimit = unpack(ARGV)
+		local kClaimed, kAttempts, kUnclaimed, kData, kAbandoned, kDelayed, kSha1, kQwJobs = unpack(KEYS)
+		local rClaimCutoff, rPruneCutoff, rAttempts, rTime, queueId, rLimit, rQueue, rDomain = unpack(ARGV)
 		local released,abandoned,pruned,undelayed,ready = 0,0,0,0,0
 		-- Short-circuit if there is nothing at all in the queue
 		if redis.call('exists',kData) == 0 then
@@ -138,6 +144,16 @@ class PeriodicScriptParamsIterator implements Iterator {
 			redis.call('sAdd',kQwJobs,queueId)
 		else
 			redis.call('sRem',kQwJobs,queueId)
+			redis.call('DEL', rDomain .. ':jobqueue:' .. rQueue .. ':h-data')
+		end
+		-- Remove rootjobs
+		local rootJobs = redis.call('KEYS', 'global:jobqueue:*:rootjob:*')
+		for k,job in ipairs(rootJobs) do
+			redis.call('DEL', job)
+		end
+		-- Purge un-runnable jobs
+		if rQueue == 'LocalGlobalUserPageCacheUpdateJob' and redis.call('HLEN', kSha1) == 0 then
+		    redis.call('LTRIM', kUnclaimed, 1, 0)
 		end
 		return {released,abandoned,pruned,undelayed,ready}
 LUA;
