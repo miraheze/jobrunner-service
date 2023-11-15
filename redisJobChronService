@@ -421,6 +421,16 @@ class PeriodicScriptParamsIterator implements Iterator {
 			redis.call('sAdd',kQwJobs,queueId)
 		else
 			redis.call('sRem',kQwJobs,queueId)
+			redis.call('DEL', rDomain .. ':jobqueue:' .. rQueue .. ':h-data')
+		end
+		-- Remove rootjobs
+		local rootJobs = redis.call('KEYS', 'global:jobqueue:*:rootjob:*')
+		for k,job in ipairs(rootJobs) do
+			redis.call('DEL', job)
+		end
+		-- Purge un-runnable jobs
+		if rQueue == 'LocalGlobalUserPageCacheUpdateJob' and redis.call('HLEN', kSha1) == 0 then
+			redis.call('LTRIM', kUnclaimed, 1, 0)
 		end
 		return {released,abandoned,pruned,undelayed,ready}
 LUA;
