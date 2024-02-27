@@ -32,12 +32,12 @@ class JobRunnerPipeline {
 	}
 
 	/**
-	 * @param integer $loop
+	 * @param int $loop
 	 * @param array $prioMap
-	 * @param array $pending
+	 * @param array &$pending
 	 * @return array
 	 */
-	public function refillSlots( int $loop, array $prioMap, array &$pending ) : array {
+	public function refillSlots( int $loop, array $prioMap, array &$pending ): array {
 		$free = 0;
 		$new = 0;
 		$host = gethostname();
@@ -56,7 +56,8 @@ class JobRunnerPipeline {
 					$cmd = $procSlot['cmd'];
 					$this->srvc->error( "Runner loop $loop process in slot $slot timed out " .
 						"[{$age}s; max: {$maxReal}s]:\n$cmd" );
-					posix_kill( $status['pid'], SIGTERM ); // non-blocking
+					// non-blocking
+					posix_kill( $status['pid'], SIGTERM );
 					$procSlot['sigtime'] = time();
 					$this->srvc->incrStats( 'runner-status.timeout' );
 				} elseif ( $age >= $maxReal && ( $cTime - $procSlot['sigtime'] ) > 5 ) {
@@ -64,18 +65,20 @@ class JobRunnerPipeline {
 					$this->closeRunner( $loop, $slot, $procSlot, SIGKILL );
 					$this->srvc->incrStats( 'runner-status.kill' );
 				} else {
-					continue; // slot is busy
+					// slot is busy
+					continue;
 				}
 			} elseif ( $status && !$status['running'] ) {
 				// $result will be an array if no exceptions happened
 				$result = json_decode( trim( $procSlot['stdout'] ), true );
-				if ( (int)$status['exitcode'] == 0 && is_array( $result ) ) {
+				if ( $status['exitcode'] == 0 && is_array( $result ) ) {
 					// If this finished early, lay off of the queue for a while
-					if ( ( $cTime - $procSlot['stime'] ) < $this->srvc->hpMaxTime/2 ) {
+					if ( ( $cTime - $procSlot['stime'] ) < $this->srvc->hpMaxTime / 2 ) {
 						unset( $pending[$procSlot['type']][$procSlot['db']] );
 						$this->srvc->debug( "Queue '{$procSlot['db']}/{$procSlot['type']}' emptied." );
 					}
-					$ok = 0; // jobs that ran OK
+					// jobs that ran OK
+					$ok = 0;
 					foreach ( $result['jobs'] as $status ) {
 						$ok += ( $status['status'] === 'ok' ) ? 1 : 0;
 					}
@@ -93,7 +96,8 @@ class JobRunnerPipeline {
 						$cmd .= ' STDOUT:';
 					}
 
-					if ( strlen( $error ) > 4096 ) { // truncate long errors
+					if ( strlen( $error ) > 4096 ) {
+						// truncate long errors
 						$error = mb_substr( $error, 0, 4096 ) . '...';
 					}
 					$this->srvc->error( "Runner loop $loop process in slot $slot " .
@@ -122,10 +126,10 @@ class JobRunnerPipeline {
 	}
 
 	/**
-	 * @param integer $loop
+	 * @param int $loop
 	 * @param array $prioMap
 	 * @param array $pending
-	 * @return array|boolean
+	 * @return array|bool
 	 */
 	protected function selectQueue( int $loop, array $prioMap, array $pending ) {
 		$include = $this->srvc->loopMap[$loop]['include'];
@@ -141,7 +145,8 @@ class JobRunnerPipeline {
 
 		$candidateTypes = array_diff( array_unique( $include ), $exclude, [ '*' ] );
 
-		$candidates = []; // list of (type, db)
+		// list of (type, db)
+		$candidates = [];
 		// Flatten the tree of candidates into a flat list so that a random
 		// item can be selected, weighing each queue (type/db tuple) equally.
 		foreach ( $candidateTypes as $type ) {
@@ -153,21 +158,22 @@ class JobRunnerPipeline {
 		}
 
 		if ( !count( $candidates ) ) {
-			return false; // no jobs for this type
+			// no jobs for this type
+			return false;
 		}
 
 		return $candidates[mt_rand( 0, count( $candidates ) - 1 )];
 	}
 
 	/**
-	 * @param integer $loop
-	 * @param integer $slot
+	 * @param int $loop
+	 * @param int $slot
 	 * @param bool $highPrio
 	 * @param array $queue
-	 * @param array $procSlot
+	 * @param array &$procSlot
 	 * @return bool
 	 */
-	protected function spawnRunner( int $loop, int $slot, bool $highPrio, array $queue, array &$procSlot ) : bool {
+	protected function spawnRunner( int $loop, int $slot, bool $highPrio, array $queue, array &$procSlot ): bool {
 		// Pick a random queue
 		[ $type, $db ] = $queue;
 		$maxtime = $highPrio ? $this->srvc->lpMaxTime : $this->srvc->hpMaxTime;
@@ -186,9 +192,12 @@ class JobRunnerPipeline {
 		$cmd = str_replace( $what, $with, $this->srvc->dispatcher );
 
 		$descriptors = [
-			0 => [ "pipe", "r" ], // stdin (child)
-			1 => [ "pipe", "w" ], // stdout (child)
-			2 => [ "pipe", "w" ] // stderr (child)
+			// stdin (child)
+			0 => [ "pipe", "r" ],
+			// stdout (child)
+			1 => [ "pipe", "w" ],
+			// stderr (child)
+			2 => [ "pipe", "w" ]
 		];
 
 		$this->srvc->debug( "Spawning runner in loop $loop at slot $slot ($type, $db):\n\t$cmd." );
@@ -204,7 +213,8 @@ class JobRunnerPipeline {
 			stream_set_timeout( $procSlot['pipes'][2], 1 );
 			// Close the unused STDIN pipe
 			fclose( $procSlot['pipes'][0] );
-			unset( $procSlot['pipes'][0] ); // unused
+			// unused
+			unset( $procSlot['pipes'][0] );
 		}
 
 		$procSlot['db'] = $db;
@@ -226,9 +236,9 @@ class JobRunnerPipeline {
 	}
 
 	/**
-	 * @param integer $loop
-	 * @param integer $slot
-	 * @param array $procSlot
+	 * @param int $loop
+	 * @param int $slot
+	 * @param array &$procSlot
 	 * @param int|null $signal
 	 */
 	protected function closeRunner( int $loop, int $slot, array &$procSlot, int $signal = null ) {
