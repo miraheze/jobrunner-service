@@ -241,7 +241,7 @@ class JobRunnerPipeline {
 	 * @param array &$procSlot
 	 * @param int|null $signal
 	 */
-	protected function closeRunner( int $loop, int $slot, array &$procSlot, int $signal = null ) {
+	protected function closeRunner( int $loop, int $slot, array &$procSlot, ?int $signal = null ) {
 		if ( $procSlot['pipes'] ) {
 			if ( $procSlot['pipes'][1] !== false ) {
 				fclose( $procSlot['pipes'][1] );
