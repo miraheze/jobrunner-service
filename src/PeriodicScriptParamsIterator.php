@@ -24,6 +24,11 @@ class PeriodicScriptParamsIterator implements Iterator {
 		reset( $this->queueIds );
 	}
 
+	/**
+	 * Script parameters for the current queue, or false when there are no more queues.
+	 *
+	 * @return array|false
+	 */
 	#[ReturnTypeWillChange]
 	public function current() {
 		$queueId = current( $this->queueIds );
@@ -75,6 +80,11 @@ class PeriodicScriptParamsIterator implements Iterator {
 		];
 	}
 
+	/**
+	 * Position of the current queue in the list, or null when past the end.
+	 *
+	 * @return int|string|null
+	 */
 	#[ReturnTypeWillChange]
 	public function key() {
 		return key( $this->queueIds );
